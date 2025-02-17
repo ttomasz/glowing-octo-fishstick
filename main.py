@@ -2,7 +2,7 @@ import csv
 import dataclasses
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import scrapers.models
@@ -11,12 +11,15 @@ import scrapers.wywrota
 
 logger = logging.getLogger()
 DATA_DIR = Path("data")
+type Generator_SongChordsLink = Generator[scrapers.models.SongChordsLink, None, None]
 
 
-def scrape_and_save(output_file: Path, scraper: Callable, model: dataclasses.dataclass) -> int:
+def scrape_and_save(output_file: Path, scraper: Callable[..., Generator_SongChordsLink]) -> int:
+    """Scrape data using provided scraper function and save it to a CSV file. Returns number of rows written."""
+
     rows_written = 0
     with output_file.open(mode="w", encoding="utf-8", newline="") as file:
-        fieldnames = [field.name for field in dataclasses.fields(model)]
+        fieldnames = [field.name for field in dataclasses.fields(scrapers.models.SongChordsLink)]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for chord in scraper():
@@ -33,7 +36,6 @@ def main() -> None:
     ug_rows_written = scrape_and_save(
         output_file=ug_file_path,
         scraper=scrapers.ultimate_guitar.parse,
-        model=scrapers.models.SongChordsLink,
     )
     logger.info("Scraping finished for Ultimate-Guitar. %d rows written to %s", ug_rows_written, ug_file_path)
 
@@ -41,7 +43,6 @@ def main() -> None:
     wywrota_rows_written = scrape_and_save(
         output_file=wywrota_file_path,
         scraper=scrapers.wywrota.parse,
-        model=scrapers.models.SongChordsLink,
     )
     logger.info("Scraping finished for Wywrota. %d rows written to %s", wywrota_rows_written, wywrota_file_path)
 
