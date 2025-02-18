@@ -12,3 +12,9 @@ class SongChordsLink:
     difficulty: str | None = None
     tonality_name: str | None = None
     views: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Song:
+    artist: str
+    title: str
