@@ -48,9 +48,9 @@ class SongTable:
         for song in self.data:
             for idx, chord in enumerate(song.chords):
                 if idx == 0:
-                    yield (song.artist, song.title, *astuple(chord))
+                    yield (song.artist, song.title, *astuple(chord), song.liked_on_spotify)
                 else:
-                    yield ("", "", *astuple(chord))
+                    yield ("", "", *astuple(chord), song.liked_on_spotify)
 
     def _data_as_html_table(self) -> str:
         if len(self.data) == 0:
@@ -87,5 +87,8 @@ table = SongTable("div-results")
 def new_shuffle(*args, **kwargs) -> None:
     conn.execute("SELECT artist, title, chords, liked_on_spotify FROM chords ORDER BY random() desc LIMIT 10")
     data = conn.fetchall()
-    songs = [Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]]) for row in data]
+    songs = [
+        Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
+        for row in data
+    ]
     table.set_data(songs)
