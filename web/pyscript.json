@@ -1,0 +1,6 @@
+{
+    "packages": ["duckdb", "tabulate"],
+    "files": {
+        "chords.parquet": "chords.parquet"
+    }
+}

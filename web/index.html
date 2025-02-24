@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+    <head>
+        <!-- Recommended meta tags -->
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+        <!-- PyScript CSS -->
+        <link rel="stylesheet" href="https://pyscript.net/releases/2025.2.3/core.css">
+        <!-- This script tag bootstraps PyScript -->
+        <script type="module" src="https://pyscript.net/releases/2025.2.3/core.js"></script>
+    </head>
+    <body>
+        <!-- Load our code -->
+        <script type="py" src="./main.py" config="./pyscript.json"></script>
+
+        <span>Number of songs in dataset: <span id="span-count"></span></span>
+        <button id="button-shuffle" py-click="new_shuffle">Shuffle</button>
+        <br/>
+        <div id="div-results"></div>
+    </body>
+</html>
