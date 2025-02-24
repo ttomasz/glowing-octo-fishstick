@@ -1,6 +1,6 @@
 WITH
 all_chords as (
-  SELECT
+  SELECT DISTINCT
     trim(artist) as artist,
     trim(title) as title,
     url,
@@ -10,9 +10,10 @@ all_chords as (
     difficulty,
     tonality_name,
     views,
-    1 as src_order FROM read_csv_auto($ultimate_guitar_file_path)
+    1 as src_order
+  FROM read_csv_auto($ultimate_guitar_file_path)
   UNION ALL
-  SELECT
+  SELECT DISTINCT
     trim(artist) as artist,
     trim(title) as title,
     url,
