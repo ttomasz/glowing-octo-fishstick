@@ -10,11 +10,11 @@ from tabulate import tabulate
 class Chord:
     version: int
     url: str
-    rating: float
-    votes: int
-    difficulty: str
-    tonality_name: str
-    views: int
+    rating: float | None
+    votes: int | None
+    difficulty: str | None
+    tonality_name: str | None
+    views: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,14 +22,23 @@ class Song:
     artist: str
     title: str
     chords: list[Chord]
-
-    def as_html(self) -> str:
-        pass
+    liked_on_spotify: bool
 
 
 class SongTable:
     def __init__(self, results_element_id: str) -> None:
-        self.columns = ["Artist", "Title", "Version", "URL", "Rating", "Votes", "Difficulty", "Tonality", "Views"]
+        self.columns = [
+            "Artist",
+            "Title",
+            "Version",
+            "URL",
+            "Rating",
+            "Votes",
+            "Difficulty",
+            "Tonality",
+            "Views",
+            "Liked on Spotify",
+        ]
         self.data: list[Song] = []
         self.results_element_id = results_element_id
         self.results_html_element = document.getElementById(results_element_id)
@@ -76,7 +85,7 @@ table = SongTable("div-results")
 
 
 def new_shuffle(*args, **kwargs) -> None:
-    conn.execute("SELECT artist, title, chords FROM chords ORDER BY random() desc LIMIT 10")
+    conn.execute("SELECT artist, title, chords, liked_on_spotify FROM chords ORDER BY random() desc LIMIT 10")
     data = conn.fetchall()
     songs = [Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]]) for row in data]
     table.set_data(songs)
