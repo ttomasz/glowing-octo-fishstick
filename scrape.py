@@ -31,8 +31,7 @@ def scrape_and_save(
     return rows_written
 
 
-def main() -> None:
-    args = sys.argv
+def main(args: list[str]) -> None:
     scrape_wywrota = "--scrape-wywrota" in args
     scrape_ultimate_guitar = "--scrape-ultimate-guitar" in args
     scrape_spotify = "--scrape-spotify" in args
@@ -87,4 +86,4 @@ if __name__ == "__main__":
     logger.addHandler(handler)
     # ---
 
-    main()
+    main(args=sys.argv)
