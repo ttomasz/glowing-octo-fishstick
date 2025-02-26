@@ -10,6 +10,14 @@
         <link rel="stylesheet" href="./style.css">
         <!-- This script tag bootstraps PyScript -->
         <script type="module" src="https://pyscript.net/releases/2025.2.3/core.js"></script>
+
+        <!-- for loading screen -->
+        <script type="module">
+            const loading = document.getElementById('loading');
+            addEventListener('py:ready', () => loading.close());
+            loading.showModal();
+        </script>
+
     </head>
     <body>
         <!-- Load our code -->
@@ -20,6 +28,9 @@
             <span>Number of songs in dataset: <span class="count" id="span-count"></span></span>
         </div>
         <br/>
+        <dialog id="loading">
+            <h1>Loading</h1>
+        </dialog>
         <div id="div-results"></div>
     </body>
 </html>
