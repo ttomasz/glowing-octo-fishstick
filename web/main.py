@@ -106,7 +106,10 @@ def new_shuffle(*args, **kwargs) -> None:
                 chords,
                 CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
             FROM chords
-            ORDER BY random() desc
+            ORDER BY (
+                random()
+                + CASE liked_on_spotify WHEN true THEN 0.01 ELSE 0 END
+            ) desc
             LIMIT 10
         """)
         data = conn.fetchall()
