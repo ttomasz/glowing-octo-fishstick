@@ -6,6 +6,8 @@
         <meta name="viewport" content="width=device-width,initial-scale=1.0">
         <!-- PyScript CSS -->
         <link rel="stylesheet" href="https://pyscript.net/releases/2025.2.3/core.css">
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="./style.css">
         <!-- This script tag bootstraps PyScript -->
         <script type="module" src="https://pyscript.net/releases/2025.2.3/core.js"></script>
     </head>
@@ -13,8 +15,10 @@
         <!-- Load our code -->
         <script type="py" src="./main.py" config="./pyscript.json"></script>
 
-        <span>Number of songs in dataset: <span id="span-count"></span></span>
-        <button id="button-shuffle" py-click="new_shuffle">Shuffle</button>
+        <div class="header">
+            <button class="button" id="button-shuffle" py-click="new_shuffle">Shuffle</button>
+            <span>Number of songs in dataset: <span class="count" id="span-count"></span></span>
+        </div>
         <br/>
         <div id="div-results"></div>
     </body>

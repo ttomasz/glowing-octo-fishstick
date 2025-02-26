@@ -79,13 +79,22 @@ conn = duckdb.connect(":memory:")
 conn.execute("CREATE TABLE chords AS SELECT * FROM 'chords.parquet'")
 conn.execute("SELECT count(*) FROM chords")
 number_of_songs = conn.fetchone()[0]
-document.getElementById("span-count").textContent = number_of_songs
+document.getElementById("span-count").textContent = f"{number_of_songs:,}"
 # table managing singleton
 table = SongTable("div-results")
 
 
 def new_shuffle(*args, **kwargs) -> None:
-    conn.execute("SELECT artist, title, chords, liked_on_spotify FROM chords ORDER BY random() desc LIMIT 10")
+    conn.execute("""
+        SELECT
+            artist,
+            title,
+            chords,
+            CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
+        FROM chords
+        ORDER BY random() desc
+        LIMIT 10
+    """)
     data = conn.fetchall()
     songs = [
         Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
