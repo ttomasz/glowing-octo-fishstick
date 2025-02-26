@@ -62,6 +62,11 @@
   transform: translateY(4px);
 }
 
+.button:disabled {
+  background-color: #aaaaaa;
+  cursor: not-allowed;
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
