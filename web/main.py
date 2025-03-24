@@ -45,7 +45,7 @@ class ShuffleButton:
 
 
 class SongTable:
-    def __init__(self, results_element_id: str, back_button_element_id: str, history_size: int = 20) -> None:
+    def __init__(self, results_element_id: str, back_button_element_id: str, history_size: int = 10) -> None:
         self.columns = [
             "Artist",
             "Title",
@@ -121,6 +121,7 @@ class SongTable:
 # init db
 conn = duckdb.connect(":memory:")
 conn.execute("CREATE TABLE chords AS SELECT * FROM 'chords.parquet'")
+conn.execute("CREATE TABLE previous_songs (artist TEXT NOT NULL, title TEXT NOT NULL)")
 conn.execute("""
              SELECT
                 count(*) as number_of_songs,
@@ -141,23 +142,41 @@ shuffle_button_manager = ShuffleButton(
     shuffle_button_element_id="button-shuffle",
     back_button_element_id="button-back",
 )
+liked_songs_modifier_element = document.getElementById("liked-modifier")
+ug_url_modifier_element = document.getElementById("ug-modifier")
+wywrota_url_modifier_element = document.getElementById("wywrota-modifier")
 
 
 def new_shuffle(*args, **kwargs) -> None:
+    previous_songs = {(song.artist, song.title) for entry in table.previous_data for song in entry}
+    if previous_songs:
+        conn.execute("TRUNCATE previous_songs")
+        conn.executemany("INSERT INTO previous_songs VALUES (?, ?)", previous_songs)
+    query = """
+        SELECT
+            artist,
+            title,
+            chords,
+            CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
+        FROM chords
+        ANTI JOIN previous_songs USING(artist, title)
+        ORDER BY (
+            random()
+            + CASE liked_on_spotify WHEN true THEN ? ELSE 0 END
+            + CASE has_ug_tabs WHEN 1 THEN ? ELSE 0 END
+            + CASE has_wywrota_tabs WHEN 1 THEN ? ELSE 0 END
+        ) desc
+        LIMIT 10
+    """
     with shuffle_button_manager:
-        conn.execute("""
-            SELECT
-                artist,
-                title,
-                chords,
-                CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
-            FROM chords
-            ORDER BY (
-                random()
-                + CASE liked_on_spotify WHEN true THEN 0.01 ELSE 0 END
-            ) desc
-            LIMIT 10
-        """)
+        conn.execute(
+            query=query,
+            parameters=[
+                float(liked_songs_modifier_element.value),
+                float(ug_url_modifier_element.value),
+                float(wywrota_url_modifier_element.value),
+            ],
+        )
         data = conn.fetchall()
         songs = [
             Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])

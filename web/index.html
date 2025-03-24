@@ -30,8 +30,39 @@
             <button class="button" id="button-back" disabled py-click="go_back">⬅️</button>
             <button class="button" id="button-shuffle" py-click="new_shuffle">Shuffle</button>
             <span>Number of songs in dataset: <span class="count" id="span-count"></span> (wywrota: <span id="span-count-wywrota"></span>, ultimate-guitar: <span id="span-count-ug"></span>)</span>
+            <button class="accordion">⚙️ Settings</button>
+            <div class="panel">
+                <label for="liked-modifier">Modifier for liked songs:</label>
+                <input class="parameter" type="number" id="liked-modifier" value="0.01" min="-1" max="1" step="0.01">
+                <label for="ug-modifier">Modifier for having Ultimate-Guitar url:</label>
+                <input class="parameter" type="number" id="ug-modifier" value="0.002" min="-1" max="1" step="0.001">
+                <label for="wywrota-modifier">Modifier for having Wywrota url:</label>
+                <input class="parameter" type="number" id="wywrota-modifier" value="0.00" min="-1" max="1" step="0.001">
+            </div>
         </div>
         <br/>
         <div id="div-results"></div>
+
+        <script>
+            // Accordion stuff
+            var acc = document.getElementsByClassName("accordion");
+            var i;
+
+            for (i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function() {
+                /* Toggle between adding and removing the "active" class,
+                to highlight the button that controls the panel */
+                this.classList.toggle("active");
+
+                /* Toggle between hiding and showing the active panel */
+                var panel = this.nextElementSibling;
+                if (panel.style.display === "block") {
+                    panel.style.display = "none";
+                } else {
+                    panel.style.display = "block";
+                }
+            });
+            } 
+        </script>
     </body>
 </html>
