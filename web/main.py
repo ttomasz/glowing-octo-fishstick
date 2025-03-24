@@ -26,19 +26,26 @@ class Song:
 
 
 class ShuffleButton:
-    def __init__(self, button_element_id: str) -> None:
-        self.button_element_id = button_element_id
-        self.button_html_element = document.getElementById(self.button_element_id)
+    def __init__(self, shuffle_button_element_id: str, back_button_element_id: str) -> None:
+        self.shuffle_button_element_id = shuffle_button_element_id
+        self.shuffle_button_html_element = document.getElementById(self.shuffle_button_element_id)
+        self.back_button_element_id = back_button_element_id
+        self.back_button_html_element = document.getElementById(self.back_button_element_id)
+        self.back_button_disabled = self.back_button_html_element.getAttribute("disabled")
 
     def __enter__(self) -> None:
-        self.button_html_element.setAttribute("disabled", "")
+        self.shuffle_button_html_element.setAttribute("disabled", "")
+        self.back_button_disabled = self.back_button_html_element.getAttribute("disabled")
+        self.back_button_html_element.setAttribute("disabled", "")
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self.button_html_element.removeAttribute("disabled")
+        self.shuffle_button_html_element.removeAttribute("disabled")
+        if not self.back_button_disabled:
+            self.back_button_html_element.removeAttribute("disabled")
 
 
 class SongTable:
-    def __init__(self, results_element_id: str) -> None:
+    def __init__(self, results_element_id: str, back_button_element_id: str, history_size: int = 20) -> None:
         self.columns = [
             "Artist",
             "Title",
@@ -52,7 +59,12 @@ class SongTable:
             "Liked on Spotify",
         ]
         self.data: list[Song] = []
+        self.previous_data: list[list[Song]] = []
+        self.previous_data_limit = history_size
         self.results_element_id = results_element_id
+        self.back_button_element_id = back_button_element_id
+        self.back_button_html_element = document.getElementById(self.back_button_element_id)
+        self.back_button_html_element.setAttribute("disabled", "")
         self.results_html_element = document.getElementById(results_element_id)
         self.results_html_element.innerHTML = self._data_as_html_table()
 
@@ -82,9 +94,19 @@ class SongTable:
         )
 
     def set_data(self, data: list[Song]) -> None:
+        if len(self.previous_data) >= self.previous_data_limit:
+            self.previous_data.pop(0)
+        self.previous_data.append(self.data)
         self.data = data
         self.results_html_element.innerHTML = self._data_as_html_table()
 
+    def back(self) -> None:
+        if not self.previous_data:
+            raise ValueError("No previous data to show")
+        self.data = self.previous_data.pop()
+        self.results_html_element.innerHTML = self._data_as_html_table()
+        if len(self.previous_data) == 0:
+            self.back_button_html_element.setAttribute("disabled", "")
 
 # init db
 conn = duckdb.connect(":memory:")
@@ -101,8 +123,14 @@ document.getElementById("span-count").textContent = f"{number_of_songs:,}"
 document.getElementById("span-count-wywrota").textContent = f"{wywrota_tabs:,}"
 document.getElementById("span-count-ug").textContent = f"{ug_tabs:,}"
 # table managing singleton
-table = SongTable("div-results")
-shuffle_button_manager = ShuffleButton("button-shuffle")
+table = SongTable(
+    results_element_id="div-results",
+    back_button_element_id="button-back",
+)
+shuffle_button_manager = ShuffleButton(
+    shuffle_button_element_id="button-shuffle",
+    back_button_element_id="button-back",
+)
 
 
 def new_shuffle(*args, **kwargs) -> None:
@@ -126,3 +154,7 @@ def new_shuffle(*args, **kwargs) -> None:
             for row in data
         ]
         table.set_data(songs)
+
+
+def go_back(*args, **kwargs) -> None:
+    table.back()
