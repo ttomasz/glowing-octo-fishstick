@@ -10,7 +10,9 @@ all_chords as (
     difficulty,
     tonality_name,
     views,
-    1 as src_order
+    1 as src_order,
+    1 as has_ug_tabs,
+    0 as has_wywrota_tabs
   FROM read_csv_auto($ultimate_guitar_file_path)
   UNION ALL
   SELECT DISTINCT
@@ -23,7 +25,9 @@ all_chords as (
     difficulty,
     tonality_name,
     views,
-    0 as src_order
+    0 as src_order,
+    0 as has_ug_tabs,
+    1 as has_wywrota_tabs
   FROM read_csv($wywrota_file_path, columns := {
     'artist': 'varchar',
     'title': 'varchar',
@@ -59,7 +63,9 @@ songs_aggregated as (
       order by src_order asc, version desc
     ) as chords,
     sum(views) as total_views,
-    round(sum(rating * votes) / sum(votes), 2) as avg_rating
+    round(sum(rating * votes) / sum(votes), 2) as avg_rating,
+    coalesce(max(has_ug_tabs), 0) as has_ug_tabs,
+    coalesce(max(has_wywrota_tabs), 0) as has_wywrota_tabs
   FROM all_chords
   GROUP BY artist, title
 )
