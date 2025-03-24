@@ -89,9 +89,17 @@ class SongTable:
 # init db
 conn = duckdb.connect(":memory:")
 conn.execute("CREATE TABLE chords AS SELECT * FROM 'chords.parquet'")
-conn.execute("SELECT count(*) FROM chords")
-number_of_songs = conn.fetchone()[0]
+conn.execute("""
+             SELECT
+                count(*) as number_of_songs,
+                sum(has_ug_tabs) as ug_tabs,
+                sum(has_wywrota_tabs) as wywrota_tabs
+             FROM chords
+             """)
+number_of_songs, ug_tabs, wywrota_tabs = conn.fetchone()
 document.getElementById("span-count").textContent = f"{number_of_songs:,}"
+document.getElementById("span-count-wywrota").textContent = f"{wywrota_tabs:,}"
+document.getElementById("span-count-ug").textContent = f"{ug_tabs:,}"
 # table managing singleton
 table = SongTable("div-results")
 shuffle_button_manager = ShuffleButton("button-shuffle")
