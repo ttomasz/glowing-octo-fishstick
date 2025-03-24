@@ -76,12 +76,22 @@ class SongTable:
                 else:
                     yield ("", "", *astuple(chord), song.liked_on_spotify)
 
+    @staticmethod
+    def _site_symbol(url: str) -> str:
+        if "wywrota" in url:
+            return '<img src="./wywrota-icon.png" alt="(W)" width="16" height="16"/>'
+        if "ultimate-guitar" in url:
+            return '<img src="./ug-icon.ico" alt="(UG)" width="16" height="16"/>'
+        return "🔗"
+
     def _data_as_html_table(self) -> str:
         if len(self.data) == 0:
             return ""
         url_col_idx = self.columns.index("URL")
         data_with_urls_as_links = (
-            t[:url_col_idx] + (f'<a href="{t[url_col_idx]}" target="_blank">Link ↗️</a>',) + t[url_col_idx + 1 :]
+            t[:url_col_idx]
+            + (f'<a href="{t[url_col_idx]}" target="_blank">{self._site_symbol(t[url_col_idx])} Link ↗️</a>',)
+            + t[url_col_idx + 1 :]
             for t in self._flat_data()
         )
         return tabulate(
