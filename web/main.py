@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from dataclasses import astuple, dataclass
 
 import duckdb
@@ -25,27 +25,129 @@ class Song:
     liked_on_spotify: bool
 
 
-class ShuffleButton:
-    def __init__(self, shuffle_button_element_id: str, back_button_element_id: str) -> None:
-        self.shuffle_button_element_id = shuffle_button_element_id
-        self.shuffle_button_html_element = document.getElementById(self.shuffle_button_element_id)
-        self.back_button_element_id = back_button_element_id
-        self.back_button_html_element = document.getElementById(self.back_button_element_id)
-        self.back_button_disabled = self.back_button_html_element.getAttribute("disabled")
+@dataclass(frozen=True, slots=True)
+class Stats:
+    number_of_songs: int
+    ug_tabs: int
+    wywrota_tabs: int
+
+
+@dataclass(frozen=True, slots=True)
+class Modifiers:
+    liked_songs_modifier: float
+    ug_url_modifier: float
+    wywrota_url_modifier: float
+
+
+class DataStore:
+    def __init__(self) -> None:
+        self.conn = duckdb.connect(":memory:")
+        self.conn.execute("CREATE TABLE chords AS SELECT * FROM 'chords.parquet'")
+        self.conn.execute("CREATE TABLE previous_songs (artist TEXT NOT NULL, title TEXT NOT NULL)")
+        self.get_songs_query = """
+            SELECT
+                artist,
+                title,
+                chords,
+                CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
+            FROM chords
+            ANTI JOIN previous_songs USING(artist, title)
+            ORDER BY (
+                random()
+                + CASE liked_on_spotify WHEN true THEN ? ELSE 0 END
+                + CASE has_ug_tabs WHEN 1 THEN ? ELSE 0 END
+                + CASE has_wywrota_tabs WHEN 1 THEN ? ELSE 0 END
+            ) desc
+            LIMIT 10
+        """
+
+    def get_stats(self) -> Stats:
+        self.conn.execute("""
+            SELECT
+                count(*) as number_of_songs,
+                sum(has_ug_tabs) as ug_tabs,
+                sum(has_wywrota_tabs) as wywrota_tabs
+            FROM chords
+        """)
+        number_of_songs, ug_tabs, wywrota_tabs = self.conn.fetchone()
+        return Stats(
+            number_of_songs=number_of_songs,
+            ug_tabs=ug_tabs,
+            wywrota_tabs=wywrota_tabs,
+        )
+
+    def get_songs(
+        self,
+        liked_songs_modifier: float = 0.0,
+        ug_url_modifier: float = 0.0,
+        wywrota_url_modifier: float = 0.0,
+        previous_songs: Iterable[tuple[str, str]] | None = None,
+    ) -> list[Song]:
+        if previous_songs:
+            self.conn.execute("TRUNCATE previous_songs")
+            self.conn.executemany("INSERT INTO previous_songs VALUES (?, ?)", previous_songs)
+        self.conn.execute(
+            query=self.get_songs_query,
+            parameters=[
+                liked_songs_modifier,
+                ug_url_modifier,
+                wywrota_url_modifier,
+            ],
+        )
+        data = self.conn.fetchall()
+        songs = [
+            Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
+            for row in data
+        ]
+        return songs
+
+
+class ButtonManager:
+    def __init__(self, element_id: str, *, disabled: bool) -> None:
+        self.element_id = element_id
+        self.html_element = document.getElementById(self.element_id)
+        self.disabled = disabled
+        if self.disabled:
+            self.html_element.setAttribute("disabled", "")
+
+    def disable(self) -> None:
+        if not self.disabled:
+            self.html_element.setAttribute("disabled", "")
+            self.disabled = True
+
+    def enable(self) -> None:
+        if self.disabled:
+            self.html_element.removeAttribute("disabled")
+            self.disabled = False
 
     def __enter__(self) -> None:
-        self.shuffle_button_html_element.setAttribute("disabled", "")
-        self.back_button_disabled = self.back_button_html_element.getAttribute("disabled")
-        self.back_button_html_element.setAttribute("disabled", "")
+        self.disable()
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self.shuffle_button_html_element.removeAttribute("disabled")
-        if not self.back_button_disabled:
-            self.back_button_html_element.removeAttribute("disabled")
+        self.enable()
+
+
+class Settings:
+    def __init__(
+        self,
+        liked_songs_modifier_element_id: str,
+        ug_url_modifier_element_id: str,
+        wywrota_url_modifier_element_id: str,
+    ) -> None:
+        self.liked_songs_modifier_element = document.getElementById(liked_songs_modifier_element_id)
+        self.ug_url_modifier_element = document.getElementById(ug_url_modifier_element_id)
+        self.wywrota_url_modifier_element = document.getElementById(wywrota_url_modifier_element_id)
+
+    def get_modifiers(self) -> Modifiers:
+        return Modifiers(
+            liked_songs_modifier=float(self.liked_songs_modifier_element.value),
+            ug_url_modifier=float(self.ug_url_modifier_element.value),
+            wywrota_url_modifier=float(self.wywrota_url_modifier_element.value),
+        )
 
 
 class SongTable:
-    def __init__(self, results_element_id: str, back_button_element_id: str, history_size: int = 10) -> None:
+    def __init__(self, results_element_id: str, history_size: int = 10) -> None:
         self.columns = [
             "Artist",
             "Title",
@@ -62,11 +164,7 @@ class SongTable:
         self.previous_data: list[list[Song]] = []
         self.previous_data_limit = history_size
         self.results_element_id = results_element_id
-        self.back_button_element_id = back_button_element_id
-        self.back_button_html_element = document.getElementById(self.back_button_element_id)
-        self.back_button_html_element.setAttribute("disabled", "")
-        self.results_html_element = document.getElementById(results_element_id)
-        self.results_html_element.innerHTML = self._data_as_html_table()
+        self.results_html_element = document.getElementById(self.results_element_id)
 
     def _flat_data(self) -> Generator[tuple, None, None]:
         for song in self.data:
@@ -110,80 +208,48 @@ class SongTable:
         self.data = data
         self.results_html_element.innerHTML = self._data_as_html_table()
 
-    def back(self) -> None:
+    def load_previous(self) -> int:
         if not self.previous_data:
             raise ValueError("No previous data to show")
         self.data = self.previous_data.pop()
         self.results_html_element.innerHTML = self._data_as_html_table()
-        if len(self.previous_data) == 0:
-            self.back_button_html_element.setAttribute("disabled", "")
+        return len(self.previous_data)
+
 
 # init db
-conn = duckdb.connect(":memory:")
-conn.execute("CREATE TABLE chords AS SELECT * FROM 'chords.parquet'")
-conn.execute("CREATE TABLE previous_songs (artist TEXT NOT NULL, title TEXT NOT NULL)")
-conn.execute("""
-             SELECT
-                count(*) as number_of_songs,
-                sum(has_ug_tabs) as ug_tabs,
-                sum(has_wywrota_tabs) as wywrota_tabs
-             FROM chords
-             """)
-number_of_songs, ug_tabs, wywrota_tabs = conn.fetchone()
-document.getElementById("span-count").textContent = f"{number_of_songs:,}"
-document.getElementById("span-count-wywrota").textContent = f"{wywrota_tabs:,}"
-document.getElementById("span-count-ug").textContent = f"{ug_tabs:,}"
+data_store = DataStore()
+# update header
+stats = data_store.get_stats()
+document.getElementById("span-count").textContent = f"{stats.number_of_songs:,}"
+document.getElementById("span-count-wywrota").textContent = f"{stats.wywrota_tabs:,}"
+document.getElementById("span-count-ug").textContent = f"{stats.ug_tabs:,}"
 # table managing singleton
-table = SongTable(
-    results_element_id="div-results",
-    back_button_element_id="button-back",
+table = SongTable(results_element_id="div-results")
+# buttons
+shuffle_button_manager = ButtonManager(element_id="button-shuffle", disabled=False)
+back_button_manager = ButtonManager(element_id="button-back", disabled=True)
+# settings element
+settings = Settings(
+    liked_songs_modifier_element_id="liked-modifier",
+    ug_url_modifier_element_id="ug-modifier",
+    wywrota_url_modifier_element_id="wywrota-modifier",
 )
-shuffle_button_manager = ShuffleButton(
-    shuffle_button_element_id="button-shuffle",
-    back_button_element_id="button-back",
-)
-liked_songs_modifier_element = document.getElementById("liked-modifier")
-ug_url_modifier_element = document.getElementById("ug-modifier")
-wywrota_url_modifier_element = document.getElementById("wywrota-modifier")
 
 
 def new_shuffle(*args, **kwargs) -> None:
     previous_songs = {(song.artist, song.title) for entry in table.previous_data for song in entry}
-    if previous_songs:
-        conn.execute("TRUNCATE previous_songs")
-        conn.executemany("INSERT INTO previous_songs VALUES (?, ?)", previous_songs)
-    query = """
-        SELECT
-            artist,
-            title,
-            chords,
-            CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
-        FROM chords
-        ANTI JOIN previous_songs USING(artist, title)
-        ORDER BY (
-            random()
-            + CASE liked_on_spotify WHEN true THEN ? ELSE 0 END
-            + CASE has_ug_tabs WHEN 1 THEN ? ELSE 0 END
-            + CASE has_wywrota_tabs WHEN 1 THEN ? ELSE 0 END
-        ) desc
-        LIMIT 10
-    """
-    with shuffle_button_manager:
-        conn.execute(
-            query=query,
-            parameters=[
-                float(liked_songs_modifier_element.value),
-                float(ug_url_modifier_element.value),
-                float(wywrota_url_modifier_element.value),
-            ],
+    modifiers = settings.get_modifiers()
+    with shuffle_button_manager, back_button_manager:
+        songs = data_store.get_songs(
+            liked_songs_modifier=modifiers.liked_songs_modifier,
+            ug_url_modifier=modifiers.ug_url_modifier,
+            wywrota_url_modifier=modifiers.wywrota_url_modifier,
+            previous_songs=previous_songs,
         )
-        data = conn.fetchall()
-        songs = [
-            Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
-            for row in data
-        ]
         table.set_data(songs)
 
 
-def go_back(*args, **kwargs) -> None:
-    table.back()
+def load_previous_songs(*args, **kwargs) -> None:
+    how_many_previous_available = table.load_previous()
+    if how_many_previous_available == 0:
+        back_button_manager.disable()
