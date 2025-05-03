@@ -17,6 +17,21 @@
             addEventListener('py:ready', () => loading.close());
             loading.showModal();
         </script>
+        <!-- Script for switching tabs -->
+         <script>
+            function showSearchTab() {
+                document.getElementById("div-random").classList.add("hidden-section");
+                document.getElementById("div-search").classList.remove("hidden-section");
+                document.getElementById("tab-shuffle").classList.remove("active-tab");
+                document.getElementById("tab-search").classList.add("active-tab");
+            }
+            function showRandomTab() {
+                document.getElementById("div-search").classList.add("hidden-section");
+                document.getElementById("div-random").classList.remove("hidden-section");
+                document.getElementById("tab-search").classList.remove("active-tab");
+                document.getElementById("tab-shuffle").classList.add("active-tab");
+            }
+         </script>
 
     </head>
     <body>
@@ -27,9 +42,13 @@
         <script type="py" src="./main.py" config="./pyscript.json"></script>
 
         <div class="header">
+            <button id="tab-shuffle" class="tab active-tab" onclick="showRandomTab()">Random</button>
+            <button id="tab-search" class="tab" onclick="showSearchTab()">Search</button>
+            <span>Number of songs in dataset: <span class="count" id="span-count"></span> (wywrota: <span id="span-count-wywrota"></span>, ultimate-guitar: <span id="span-count-ug"></span>)</span>
+        </div>
+        <div id="div-random" class="">
             <button class="button" id="button-back" disabled py-click="load_previous_songs">⬅️</button>
             <button class="button" id="button-shuffle" py-click="new_shuffle">Shuffle</button>
-            <span>Number of songs in dataset: <span class="count" id="span-count"></span> (wywrota: <span id="span-count-wywrota"></span>, ultimate-guitar: <span id="span-count-ug"></span>)</span>
             <button class="accordion">⚙️ Settings</button>
             <div class="panel">
                 <label for="liked-modifier">Modifier for liked songs:</label>
@@ -39,16 +58,21 @@
                 <label for="wywrota-modifier">Modifier for having Wywrota url:</label>
                 <input class="parameter" type="number" id="wywrota-modifier" value="0.00" min="-1" max="1" step="0.001">
             </div>
+            <br/>
+            <div id="div-results"></div>
         </div>
-        <br/>
-        <div id="div-results"></div>
+        <div id="div-search" class="hidden-section">
+            <input type="text" class="search-box" id="search-input" placeholder="Search for a song...">
+            <button class="button" id="button-search" py-click="new_search">Search</button>
+            <br/>
+            <div id="div-results-search"></div>
+        </div>
 
         <script>
             // Accordion stuff
             var acc = document.getElementsByClassName("accordion");
-            var i;
 
-            for (i = 0; i < acc.length; i++) {
+            for (let i = 0; i < acc.length; i++) {
             acc[i].addEventListener("click", function() {
                 /* Toggle between adding and removing the "active" class,
                 to highlight the button that controls the panel */

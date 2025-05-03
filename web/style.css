@@ -21,7 +21,7 @@
 }
 
 .header {
-  padding: 1em;
+  margin: 1.5em;
 }
 
 .count {
@@ -101,6 +101,12 @@ td {
   height: 2em;
 }
 
+.search-box {
+  padding: 0.2em;
+  font-size: x-large;
+  width: 20em;
+}
+
 /* Style for accordion */
 /* Style the buttons that are used to open and close the accordion panel */
  .accordion {
@@ -127,4 +133,23 @@ td {
   background-color: white;
   display: none;
   overflow: hidden;
+}
+
+/* Style for tabs */
+.tab {
+  float: left;
+  height: 36px;
+  margin: 0 8px -1px 0;
+  border: 1px solid #DAE0E7;
+  border-bottom: 4px solid #DAE0E7;
+  background: #F9F9F9;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+.active-tab {
+  border-bottom: 4px solid #5e0000;
+}
+
+.hidden-section {
+  display: none;
 }

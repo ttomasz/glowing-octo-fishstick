@@ -42,8 +42,17 @@ class Modifiers:
 class DataStore:
     def __init__(self) -> None:
         self.conn = duckdb.connect(":memory:")
-        self.conn.execute("CREATE TABLE chords AS SELECT * FROM 'chords.parquet'")
+        self.conn.execute("""
+            CREATE TABLE chords AS
+            SELECT
+                *,
+                strip_accents(lower(artist)) as search_col_a,
+                strip_accents(lower(title)) as search_col_t,
+                strip_accents(lower(concat(artist, ' ', title))) as search_col_at
+            FROM 'chords.parquet'
+        """)
         self.conn.execute("CREATE TABLE previous_songs (artist TEXT NOT NULL, title TEXT NOT NULL)")
+        self.conn.execute("ANALYZE")
         self.get_songs_query = """
             SELECT
                 artist,
@@ -60,6 +69,26 @@ class DataStore:
             ) desc
             LIMIT 10
         """
+        self.search_songs_query = """
+            WITH
+            params as (SELECT strip_accents(lower(?)) as search_term)
+            SELECT
+                artist,
+                title,
+                chords,
+                CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
+            FROM chords
+            WHERE
+                search_col_at LIKE concat('%', replace((select search_term from params), ' ', '%'), '%')
+                or search_col_a LIKE concat((select search_term from params), '%')
+                or search_col_t LIKE concat((select search_term from params), '%')
+            ORDER BY greatest(
+                jaro_similarity(search_col_at, (select search_term from params)), -- 1.0 is exact match, 0.0 is no match
+                jaro_similarity(search_col_a, (select search_term from params)),
+                jaro_similarity(search_col_t, (select search_term from params))
+            ) desc
+            LIMIT 10
+        """
 
     def get_stats(self) -> Stats:
         self.conn.execute("""
@@ -69,12 +98,22 @@ class DataStore:
                 sum(has_wywrota_tabs) as wywrota_tabs
             FROM chords
         """)
-        number_of_songs, ug_tabs, wywrota_tabs = self.conn.fetchone()
+        number_of_songs, ug_tabs, wywrota_tabs = self.conn.fetchone() # type: ignore
         return Stats(
             number_of_songs=number_of_songs,
             ug_tabs=ug_tabs,
             wywrota_tabs=wywrota_tabs,
         )
+
+    def search_songs(self, search_term: str) -> list[Song]:
+        self.conn.execute(self.search_songs_query, [search_term])
+        data = self.conn.fetchall()
+        songs = [
+            Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
+            for row in data
+        ]
+        return songs
+
 
     def get_songs(
         self,
@@ -216,28 +255,31 @@ class SongTable:
         return len(self.previous_data)
 
 
-# init db
-data_store = DataStore()
-# update header
-stats = data_store.get_stats()
-document.getElementById("span-count").textContent = f"{stats.number_of_songs:,}"
-document.getElementById("span-count-wywrota").textContent = f"{stats.wywrota_tabs:,}"
-document.getElementById("span-count-ug").textContent = f"{stats.ug_tabs:,}"
-# table managing singleton
-table = SongTable(results_element_id="div-results")
 # buttons
 shuffle_button_manager = ButtonManager(element_id="button-shuffle", disabled=False)
 back_button_manager = ButtonManager(element_id="button-back", disabled=True)
-# settings element
-settings = Settings(
-    liked_songs_modifier_element_id="liked-modifier",
-    ug_url_modifier_element_id="ug-modifier",
-    wywrota_url_modifier_element_id="wywrota-modifier",
-)
+
+with shuffle_button_manager, back_button_manager:
+    # init db
+    data_store = DataStore()
+    # update header
+    stats = data_store.get_stats()
+    document.getElementById("span-count").textContent = f"{stats.number_of_songs:,}"
+    document.getElementById("span-count-wywrota").textContent = f"{stats.wywrota_tabs:,}"
+    document.getElementById("span-count-ug").textContent = f"{stats.ug_tabs:,}"
+    # table managing singleton
+    table_shuffle_results = SongTable(results_element_id="div-results")
+    table_search_results = SongTable(results_element_id="div-results-search")
+    # settings element
+    settings = Settings(
+        liked_songs_modifier_element_id="liked-modifier",
+        ug_url_modifier_element_id="ug-modifier",
+        wywrota_url_modifier_element_id="wywrota-modifier",
+    )
 
 
 def new_shuffle(*args, **kwargs) -> None:
-    previous_songs = {(song.artist, song.title) for entry in table.previous_data for song in entry}
+    previous_songs = {(song.artist, song.title) for entry in table_shuffle_results.previous_data for song in entry}
     modifiers = settings.get_modifiers()
     with shuffle_button_manager, back_button_manager:
         songs = data_store.get_songs(
@@ -246,10 +288,22 @@ def new_shuffle(*args, **kwargs) -> None:
             wywrota_url_modifier=modifiers.wywrota_url_modifier,
             previous_songs=previous_songs,
         )
-        table.set_data(songs)
+        table_shuffle_results.set_data(songs)
 
 
 def load_previous_songs(*args, **kwargs) -> None:
-    how_many_previous_available = table.load_previous()
+    how_many_previous_available = table_shuffle_results.load_previous()
     if how_many_previous_available == 0:
         back_button_manager.disable()
+
+
+def new_search(*args, **kwargs) -> None:
+    search_term = str(document.getElementById("search-input").value).strip()
+    if not search_term:
+        table_search_results.results_html_element.innerHTML = "<p>Type search phrase</p>"
+        return
+    songs = data_store.search_songs(search_term)
+    if not songs:
+        table_search_results.results_html_element.innerHTML = "<p>No results found</p>"
+        return
+    table_search_results.set_data(songs)
