@@ -6,6 +6,7 @@ from os import getenv
 import dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from tqdm import tqdm
 
 from scrapers import models
 
@@ -23,13 +24,17 @@ def extract() -> Generator[models.Song, None, None]:
         ),
     )
     logger.info("Retrieving liked songs from Spotify...")
-    yield from _get_liked_songs(client=sp)
+    total_songs = sp.current_user_saved_tracks(limit=1)["total"] # type: ignore  # noqa: PGH003
+    limit = 50
+    for i in tqdm(range(0, total_songs + 1, limit), desc="Fetching liked songs", unit="batch"):
+        yield from _get_liked_songs(client=sp, offset=i, limit=limit)
     logger.info("Done.")
 
 
 def _get_liked_songs(client: spotipy.Spotify, offset: int = 0, limit: int = 50) -> Generator[models.Song, None, None]:
     logger.debug("Requesting liked songs from Spotify (offset=%d, limit=%d)...", offset, limit)
     results = client.current_user_saved_tracks(limit=limit, offset=offset)
+    assert results is not None  # noqa: S101
     for item in results["items"]:
         track = item["track"]
         title: str = track["name"]
@@ -87,6 +92,3 @@ def _get_liked_songs(client: spotipy.Spotify, offset: int = 0, limit: int = 50) 
                     artist=artist,
                     title=title,
                 )
-    # if we had some results continue requesting next pages
-    if len(results["items"]) > 0:
-        yield from _get_liked_songs(client=client, offset=offset + limit, limit=limit)
