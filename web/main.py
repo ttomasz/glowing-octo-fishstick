@@ -57,12 +57,24 @@ class DataStore:
         self.conn.execute("CREATE TABLE previous_songs (artist TEXT NOT NULL, title TEXT NOT NULL)")
         self.conn.execute("ANALYZE")
         self.get_songs_query = """
+            WITH
+            sample AS (
+                SELECT
+                    artist,
+                    title,
+                    chords,
+                    liked_on_spotify,
+                    has_ug_tabs,
+                    has_wywrota_tabs
+                FROM chords
+                USING SAMPLE reservoir(1000 ROWS)
+            )
             SELECT
                 artist,
                 title,
                 chords,
                 CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
-            FROM chords
+            FROM sample
             ANTI JOIN previous_songs USING(artist, title)
             ORDER BY (
                 random()
