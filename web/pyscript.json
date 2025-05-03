@@ -2,5 +2,6 @@
     "packages": ["duckdb", "tabulate"],
     "files": {
         "chords.parquet": "chords.parquet"
-    }
+    },
+    "plugins": ["!py-editor", "!py-game", "!py-terminal"]
 }
