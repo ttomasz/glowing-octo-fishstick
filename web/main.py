@@ -1,8 +1,10 @@
+import time
 from collections.abc import Generator, Iterable
 from dataclasses import astuple, dataclass
+from datetime import timedelta
 
 import duckdb
-from pyscript import document  # type: ignore
+from pyscript import document, window  # type: ignore
 from tabulate import tabulate
 
 
@@ -41,6 +43,7 @@ class Modifiers:
 
 class DataStore:
     def __init__(self) -> None:
+        window.console.log("Initializing database...")
         self.conn = duckdb.connect(":memory:")
         self.conn.execute("""
             CREATE TABLE chords AS
@@ -89,8 +92,10 @@ class DataStore:
             ) desc
             LIMIT 10
         """
+        window.console.log("Finished initializing database.")
 
     def get_stats(self) -> Stats:
+        start_time = time.perf_counter()
         self.conn.execute("""
             SELECT
                 count(*) as number_of_songs,
@@ -99,6 +104,9 @@ class DataStore:
             FROM chords
         """)
         number_of_songs, ug_tabs, wywrota_tabs = self.conn.fetchone() # type: ignore
+        end_time = time.perf_counter()
+        delta = timedelta(seconds=(end_time - start_time))
+        window.console.log(f"Getting stats from database took {delta}")
         return Stats(
             number_of_songs=number_of_songs,
             ug_tabs=ug_tabs,
@@ -106,8 +114,12 @@ class DataStore:
         )
 
     def search_songs(self, search_term: str) -> list[Song]:
+        start_time = time.perf_counter()
         self.conn.execute(self.search_songs_query, [search_term])
         data = self.conn.fetchall()
+        end_time = time.perf_counter()
+        delta = timedelta(seconds=(end_time - start_time))
+        window.console.log(f"Searching songs for term: {search_term} in database took {delta}")
         songs = [
             Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
             for row in data
@@ -122,6 +134,7 @@ class DataStore:
         wywrota_url_modifier: float = 0.0,
         previous_songs: Iterable[tuple[str, str]] | None = None,
     ) -> list[Song]:
+        start_time = time.perf_counter()
         if previous_songs:
             self.conn.execute("TRUNCATE previous_songs")
             self.conn.executemany("INSERT INTO previous_songs VALUES (?, ?)", previous_songs)
@@ -134,6 +147,9 @@ class DataStore:
             ],
         )
         data = self.conn.fetchall()
+        end_time = time.perf_counter()
+        delta = timedelta(seconds=(end_time - start_time))
+        window.console.log(f"Getting a batch of random songs from database took {delta}")
         songs = [
             Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
             for row in data
@@ -222,6 +238,7 @@ class SongTable:
         return "🔗"
 
     def _data_as_html_table(self) -> str:
+        start_time = time.perf_counter()
         if len(self.data) == 0:
             return ""
         url_col_idx = self.columns.index("URL")
@@ -231,7 +248,7 @@ class SongTable:
             + t[url_col_idx + 1 :]
             for t in self._flat_data()
         )
-        return tabulate(
+        table = tabulate(
             tabular_data=data_with_urls_as_links,
             headers=self.columns,
             tablefmt="unsafehtml",
@@ -239,6 +256,10 @@ class SongTable:
             floatfmt=".2f",
             intfmt=",",
         )
+        end_time = time.perf_counter()
+        delta = timedelta(seconds=(end_time - start_time))
+        window.console.log(f"Creating HTML table took {delta}")
+        return table
 
     def set_data(self, data: list[Song]) -> None:
         if len(self.previous_data) >= self.previous_data_limit:
@@ -276,6 +297,7 @@ with shuffle_button_manager, back_button_manager:
         ug_url_modifier_element_id="ug-modifier",
         wywrota_url_modifier_element_id="wywrota-modifier",
     )
+back_button_manager.disable()  # manually disable back button since there is no previous data yet
 
 
 def new_shuffle(*args, **kwargs) -> None:
