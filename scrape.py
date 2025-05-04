@@ -3,6 +3,7 @@ import dataclasses
 import logging
 import sys
 from collections.abc import Callable, Generator
+from functools import partial
 from pathlib import Path
 
 import scrapers.models
@@ -46,9 +47,11 @@ def main(args: list[str]) -> None:
     if scrape_ultimate_guitar:
         logger.info("Scraping started for Ultimate-Guitar")
         ug_file_path = DATA_DIR / "ultimate_guitar.csv"
+        ug_db_path = DATA_DIR / "ultimate_guitar.db"
+        parser = partial(scrapers.ultimate_guitar.parse, db_path=ug_db_path)
         ug_rows_written = scrape_and_save(
             output_file=ug_file_path,
-            scraper=scrapers.ultimate_guitar.parse,
+            scraper=parser,
             fieldnames=[field.name for field in dataclasses.fields(scrapers.models.SongChordsLink)],
         )
         logger.info("Scraping finished for Ultimate-Guitar. %d rows written to %s", ug_rows_written, ug_file_path)
