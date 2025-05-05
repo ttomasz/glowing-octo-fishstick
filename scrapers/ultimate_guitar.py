@@ -53,11 +53,14 @@ def parse(db_path: Path | None = None) -> Generator[models.SongChordsLink, None,
             urls_to_parse = cursor.fetchall()
             cursor.execute("BEGIN")
             with httpx.Client(follow_redirects=True) as client:
-                for row in tqdm(urls_to_parse, unit="url", desc="Parsing urls"):
+                for i, row in tqdm(enumerate(urls_to_parse), total=len(urls_to_parse), unit="url", desc="Parsing urls"):
                     url, rowid = row
                     parsed = [dataclasses.asdict(c) for c in _get_chord_page(client=client, artist_page_url=url)]
                     cursor.execute("UPDATE urls SET parsed = ? WHERE rowid = ?", (json.dumps(parsed), rowid))
-            db.commit()
+                    if i % 1_000 == 0:
+                        logger.debug("Committing. (i: %d)", i)
+                        db.commit()
+                db.commit()
         cursor.execute("SELECT parsed FROM urls")
         logger.info("Yielding content from db...")
         for _ in tqdm(range(numbers_of_urls_in_db), unit="row"):
