@@ -20,7 +20,9 @@ ARTIST_PAGES = (
     "0-9",
     *ascii_lowercase,
 )
-BANDS_URL_PATTERN = "https://www.ultimate-guitar.com/bands/{prefix}{page_number}.htm"
+BASE_URL = "https://www.ultimate-guitar.com"
+BANDS_URL_PATTERN = BASE_URL + "/bands/{prefix}{page_number}.htm"
+ARTIST_MIN_NUMBER_OF_SONGS = 5
 
 
 def parse(db_path: Path | None = None) -> Generator[models.SongChordsLink, None, None]:
@@ -37,10 +39,11 @@ def parse(db_path: Path | None = None) -> Generator[models.SongChordsLink, None,
         else:
             logger.info("No urls in db. Starting from scratch.")
             cursor.execute("BEGIN")
-            for prefix in tqdm(ARTIST_PAGES, unit="prefix", desc="Artist pages prefixes"):
-                artist_pages_urls = _get_artist_pages_urls(prefix=prefix)
-                for url in artist_pages_urls:
-                    cursor.execute("INSERT INTO urls(url) VALUES (?)", (url,))
+            with httpx.Client(follow_redirects=True) as client:
+                for prefix in tqdm(ARTIST_PAGES, unit="prefix", desc="Artist pages prefixes"):
+                    artist_pages_urls = _get_artist_pages_urls(client=client, prefix=prefix)
+                    for url in artist_pages_urls:
+                        cursor.execute("INSERT INTO urls(url) VALUES (?)", (url,))
             db.commit()
             cursor.execute("SELECT count(*) as cnt FROM urls")
             numbers_of_urls_in_db = cursor.fetchone()[0]
@@ -55,7 +58,7 @@ def parse(db_path: Path | None = None) -> Generator[models.SongChordsLink, None,
             with httpx.Client(follow_redirects=True) as client:
                 for i, row in tqdm(enumerate(urls_to_parse), total=len(urls_to_parse), unit="url", desc="Parsing urls"):
                     url, rowid = row
-                    parsed = [dataclasses.asdict(c) for c in _get_chord_page(client=client, artist_page_url=url)]
+                    parsed = [dataclasses.asdict(c) for c in _get_chord_pages(client=client, artist_page_url=url)]
                     cursor.execute("UPDATE urls SET parsed = ? WHERE rowid = ?", (json.dumps(parsed), rowid))
                     if i % 1_000 == 0:
                         logger.debug("Committing. (i: %d)", i)
@@ -74,10 +77,8 @@ def parse(db_path: Path | None = None) -> Generator[models.SongChordsLink, None,
         db.close()
 
 
-def _get_chord_page(client: httpx.Client, artist_page_url: str) -> Generator[models.SongChordsLink, None, None]:
-    data = _get_page_data(client=client, url=artist_page_url)
-    data = data["store"]["page"]["data"]
-    for tab in data["other_tabs"]:
+def _parse_chord_page_data(data: list[dict]) -> Generator[models.SongChordsLink, None, None]:
+    for tab in data:
         if (
             tab.get("marketing_type", "") not in ("TabPro", "official")
             and tab["type"] == "Chords"
@@ -95,15 +96,29 @@ def _get_chord_page(client: httpx.Client, artist_page_url: str) -> Generator[mod
             )
 
 
-def _get_artist_pages_urls(prefix: str) -> Generator[str, None]:
-    with httpx.Client(follow_redirects=True) as client:
-        for url in _get_list_of_artist_pages_urls(client=client, prefix=prefix):
-            data = _get_page_data(client=client, url=url)
-            data = data["store"]["page"]["data"]
-            for artist in data["artists"]:
-                if artist["tabscount"] > 0:
-                    artist_page_url = f"https://www.ultimate-guitar.com{artist['artist_url']}"
-                    yield artist_page_url
+def _get_chord_pages(client: httpx.Client, artist_page_url: str) -> Generator[models.SongChordsLink, None, None]:
+    # yield data from the first page
+    data = _get_page_data(client=client, url=artist_page_url)
+    data = data["store"]["page"]["data"]
+    yield from _parse_chord_page_data(data["other_tabs"])
+    # yield data from the other pages
+    current_page: int = data["pagination"]["current"]
+    pages: list[dict] = [p for p in data["pagination"]["pages"] if p["page"] > current_page]
+    for page in pages:
+        page_url = BASE_URL + page["url"]
+        data = _get_page_data(client=client, url=page_url)
+        data = data["store"]["page"]["data"]
+        yield from _parse_chord_page_data(data["other_tabs"])
+
+
+def _get_artist_pages_urls(client: httpx.Client, prefix: str) -> Generator[str, None]:
+    for url in _get_list_of_artist_pages_urls(client=client, prefix=prefix):
+        data = _get_page_data(client=client, url=url)
+        data = data["store"]["page"]["data"]
+        for artist in data["artists"]:
+            if artist["tabscount"] >= ARTIST_MIN_NUMBER_OF_SONGS:  # filter out artists who have very few songs
+                artist_page_url = f"{BASE_URL}{artist['artist_url']}?filter=chords"  # add filter to only get chords
+                yield artist_page_url
 
 
 def _get_list_of_artist_pages_urls(client: httpx.Client, prefix: str) -> Generator[str, None]:
