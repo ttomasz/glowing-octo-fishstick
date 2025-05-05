@@ -16,7 +16,6 @@ class Chord:
     votes: int | None
     difficulty: str | None
     tonality_name: str | None
-    views: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,7 +223,6 @@ class SongTable:
             "Votes",
             "Difficulty",
             "Tonality",
-            "Views",
             "Liked on Spotify",
         ]
         self.data: list[Song] = []
