@@ -9,7 +9,7 @@ all_chords as (
     votes,
     difficulty,
     tonality_name,
-    views,
+    -- views,
     1 as src_order,
     1 as has_ug_tabs,
     0 as has_wywrota_tabs
@@ -17,12 +17,12 @@ all_chords as (
     'artist': 'varchar',
     'title': 'varchar',
     'url': 'varchar',
-    'version': 'int64',
-    'rating': 'double',
-    'votes': 'int64',
+    'version': 'int16',
+    'rating': 'float4',
+    'votes': 'int32',
     'difficulty': 'varchar',
     'tonality_name': 'varchar',
-    'views': 'int64'
+    'views': 'int32'
   })
   UNION ALL
   SELECT DISTINCT
@@ -34,7 +34,7 @@ all_chords as (
     votes,
     difficulty,
     tonality_name,
-    views,
+    -- views,
     0 as src_order,
     0 as has_ug_tabs,
     1 as has_wywrota_tabs
@@ -42,12 +42,12 @@ all_chords as (
     'artist': 'varchar',
     'title': 'varchar',
     'url': 'varchar',
-    'version': 'int64',
-    'rating': 'double',
-    'votes': 'int64',
+    'version': 'int16',
+    'rating': 'float4',
+    'votes': 'int32',
     'difficulty': 'varchar',
     'tonality_name': 'varchar',
-    'views': 'int64'
+    'views': 'int32'
   })
 ),
 spotify_liked as (
@@ -67,12 +67,12 @@ songs_aggregated as (
         rating := rating,
         votes := votes,
         difficulty := difficulty,
-        tonality_name := tonality_name,
-        views := views
+        tonality_name := tonality_name
+        -- views := views
       )
       order by src_order asc, version desc
     ) as chords,
-    sum(views) as total_views,
+    -- sum(views) as total_views,
     round(sum(rating * votes) / sum(votes), 2) as avg_rating,
     coalesce(max(has_ug_tabs), 0) as has_ug_tabs,
     coalesce(max(has_wywrota_tabs), 0) as has_wywrota_tabs
