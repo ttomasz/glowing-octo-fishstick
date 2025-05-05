@@ -13,7 +13,17 @@ all_chords as (
     1 as src_order,
     1 as has_ug_tabs,
     0 as has_wywrota_tabs
-  FROM read_csv_auto($ultimate_guitar_file_path)
+  FROM read_csv_auto($ultimate_guitar_file_path, columns := {
+    'artist': 'varchar',
+    'title': 'varchar',
+    'url': 'varchar',
+    'version': 'int64',
+    'rating': 'double',
+    'votes': 'int64',
+    'difficulty': 'varchar',
+    'tonality_name': 'varchar',
+    'views': 'int64'
+  })
   UNION ALL
   SELECT DISTINCT
     trim(artist) as artist,
