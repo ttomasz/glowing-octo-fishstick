@@ -45,6 +45,11 @@ class DataStore:
         window.console.log("Initializing database...")
         self.conn = duckdb.connect(":memory:")
         self.conn.execute("""
+            PRAGMA disable_print_progress_bar;
+            PRAGMA disable_progress_bar;
+            SET preserve_insertion_order = false;
+        """)
+        self.conn.execute("""
             CREATE TABLE chords AS
             SELECT
                 *,
@@ -65,8 +70,7 @@ class DataStore:
                     liked_on_spotify,
                     has_ug_tabs,
                     has_wywrota_tabs
-                FROM chords
-                USING SAMPLE reservoir(1000 ROWS)
+                FROM chords TABLESAMPLE BERNOULLI(2%)
             )
             SELECT
                 artist,
@@ -287,7 +291,7 @@ class SongTable:
 
 
 # buttons
-shuffle_button_manager = ButtonManager(element_id="button-shuffle", disabled=False)
+shuffle_button_manager = ButtonManager(element_id="button-shuffle", disabled=True)
 back_button_manager = ButtonManager(element_id="button-back", disabled=True)
 
 with shuffle_button_manager, back_button_manager:
