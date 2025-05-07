@@ -87,6 +87,19 @@ class DataStore:
             ) desc
             LIMIT 10
         """
+        self.search_songs_query_exact_match = """
+            WITH
+            params as (SELECT strip_accents(lower(?)) as search_term)
+            SELECT
+                artist,
+                title,
+                chords,
+                CASE liked_on_spotify WHEN true THEN '❤️' ELSE '' END liked_on_spotify
+            FROM chords
+            WHERE
+                search_col_a = (select search_term from params)
+                or search_col_t = (select search_term from params)
+        """
         self.search_songs_query = """
             WITH
             params as (SELECT strip_accents(lower(?)) as search_term)
@@ -130,11 +143,17 @@ class DataStore:
 
     def search_songs(self, search_term: str) -> list[Song]:
         start_time = time.perf_counter()
-        self.conn.execute(self.search_songs_query, [search_term])
+        self.conn.execute(self.search_songs_query_exact_match, [search_term])
         data = self.conn.fetchall()
+        if len(data) == 0:
+            search_type = "fuzzy"
+            self.conn.execute(self.search_songs_query, [search_term])
+            data = self.conn.fetchall()
+        else:
+            search_type = "exact"
         end_time = time.perf_counter()
         delta = timedelta(seconds=(end_time - start_time))
-        window.console.log(f"Searching songs for term: {search_term} in database took {delta}")
+        window.console.log(f"Searching songs for term: {search_term} in database took {delta}. Search type: {search_type}")
         songs = [
             Song(artist=row[0], title=row[1], chords=[Chord(**chord) for chord in row[2]], liked_on_spotify=row[3])
             for row in data
@@ -334,7 +353,7 @@ def load_previous_songs(*args, **kwargs) -> None:
 
 
 def new_search(*args, **kwargs) -> None:
-    search_term = str(document.getElementById("search-input").value).strip()
+    search_term = str(document.getElementById("search-input").value).replace(" - ", " ").strip()
     if not search_term:
         table_search_results.results_html_element.innerHTML = "<p>Type search phrase</p>"
         return
@@ -343,3 +362,10 @@ def new_search(*args, **kwargs) -> None:
         table_search_results.results_html_element.innerHTML = "<p>No results found</p>"
         return
     table_search_results.set_data(songs)
+
+
+def new_search_on_keypress(event) -> None:
+    if event.key == "Enter":
+        new_search()
+    elif event.key == "Escape":
+        document.getElementById("search-input").value = ""
