@@ -21,7 +21,7 @@ void loop() {
   // if it is, the buttonState is HIGH
   if (buttonState == HIGH) {
     Serial.println("Button pressed");
-    Keyboard.press(KEY_PAGE_DOWN);
+    Keyboard.press(KEY_DOWN_ARROW);
     delay(100);
     Keyboard.releaseAll();
     delay(150);
