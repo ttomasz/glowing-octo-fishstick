@@ -27,7 +27,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D", "TRY", "EM", "RET504", "PLR0913"]
+ignore = ["D", "TRY", "EM", "RET504", "PLR0913", "T201"]
 unfixable = ["B"]
 
 [tool.ruff.format]
