@@ -178,6 +178,7 @@ class DataStore:
             self.conn.executemany("INSERT INTO previous_songs VALUES (?, ?)", previous_songs)
         delta = timedelta(seconds=(time.perf_counter() - start_time))
         window.console.log(f"Inserting previous songs into the database took {delta}")
+        window.console.log(f"Sending get_songs query with modifiers: liked_songs_modifier={liked_songs_modifier}, ug_url_modifier={ug_url_modifier}, wywrota_url_modifier={wywrota_url_modifier}")  # noqa: E501
         start_time = time.perf_counter()
         self.conn.execute(
             query=self.get_songs_query,

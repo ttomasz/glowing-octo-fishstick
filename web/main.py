@@ -79,11 +79,12 @@ settings = Settings(
 # Define functions called from HTML.
 async def ui_new_shuffle(*args, **kwargs) -> None:
     modifiers = settings.get_modifiers()
+    window.console.log(f"UI requested new shuffle with modifiers: {modifiers}")
     with shuffle_button_manager, back_button_manager:
         table = await backend_worker.new_shuffle(
-            liked_songs_modifier=modifiers.liked_songs_modifier,
-            ug_url_modifier=modifiers.ug_url_modifier,
-            wywrota_url_modifier=modifiers.wywrota_url_modifier,
+            modifiers.liked_songs_modifier,
+            modifiers.ug_url_modifier,
+            modifiers.wywrota_url_modifier,
         )
         table_shuffle_results.innerHTML = table
 
@@ -111,11 +112,11 @@ async def ui_new_search_on_keypress(event) -> None:
 
 # initialize
 window.console.log("Initializing backend worker...")
-backend_worker = await workers["backend-worker"]
+backend_worker = await workers["backend-worker"]  # noqa: F704, PLE1142
 window.console.log("Creating database...")
-await backend_worker.init_data_store_and_table()
+await backend_worker.init_data_store_and_table()  # noqa: F704, PLE1142
 window.console.log("Fetching statistics...")
-number_of_songs, ug_tabs, wywrota_tabs = await backend_worker.get_stats()
+number_of_songs, ug_tabs, wywrota_tabs = await backend_worker.get_stats()  # noqa: F704, PLE1142
 document.getElementById("span-count").textContent = f"{number_of_songs:,}"
 document.getElementById("span-count-wywrota").textContent = f"{wywrota_tabs:,}"
 document.getElementById("span-count-ug").textContent = f"{ug_tabs:,}"
