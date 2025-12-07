@@ -17,13 +17,13 @@
         <script type="module">
             const loading_pyscript = document.getElementById("loading-pyscript");
             const loading_database = document.getElementById("loading-database");
+            loading_pyscript.showModal();
             addEventListener(
                 "py:ready",
                 () => {
                     loading_pyscript.close();
                     loading_database.showModal();
                 });
-            loading_pyscript.showModal();
         </script>
         <!-- Script for switching tabs -->
          <script>

@@ -35,6 +35,35 @@ class ButtonManager:
         self.enable()
 
 
+class TableManager:
+    def __init__(self, element_id: str) -> None:
+        self.element_id = element_id
+        self.element = document.getElementById(self.element_id)
+
+    def set_loading_state(self) -> None:
+        self.element.innerHTML = """
+            <div class="loading-table">
+                <h1>Loading results</h1>
+            </div>
+        """
+
+    def __enter__(self) -> None:
+        self.set_loading_state()
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if exc_type is not None:
+            window.console.log(exc_type, exc_value, traceback)
+            # it seems that when exception is raised in the worker this part is not run but I'll leave the code here
+            # in case I ever get around to investigating if it can be made to work
+            self.element.innerHTML = f"""
+                <div>
+                    Exception {exc_type} {exc_value}
+                    <br>
+                    {traceback}
+                </div>
+            """
+
+
 class Settings:
     def __init__(
         self,
@@ -57,6 +86,7 @@ class Settings:
 # buttons
 shuffle_button_manager = ButtonManager(element_id="button-shuffle", disabled=True)
 back_button_manager = ButtonManager(element_id="button-back", disabled=True)
+search_button_manager = ButtonManager(element_id="button-search", disabled=False)
 
 
 # modals
@@ -64,8 +94,8 @@ loading_database_modal = document.getElementById("loading-database")
 
 
 # table objects
-table_shuffle_results = document.getElementById("div-results")
-table_search_results = document.getElementById("div-results-search")
+table_shuffle_results = TableManager("div-results")
+table_search_results = TableManager("div-results-search")
 
 
 # settings element
@@ -80,27 +110,28 @@ settings = Settings(
 async def ui_new_shuffle(*args, **kwargs) -> None:
     modifiers = settings.get_modifiers()
     window.console.log(f"UI requested new shuffle with modifiers: {modifiers}")
-    with shuffle_button_manager, back_button_manager:
+    with shuffle_button_manager, back_button_manager, table_shuffle_results:
         table = await backend_worker.new_shuffle(
             modifiers.liked_songs_modifier,
             modifiers.ug_url_modifier,
             modifiers.wywrota_url_modifier,
         )
-        table_shuffle_results.innerHTML = table
+        table_shuffle_results.element.innerHTML = table
 
 
 async def ui_load_previous_songs(*args, **kwargs) -> None:
-    with shuffle_button_manager, back_button_manager:
+    with shuffle_button_manager, back_button_manager, table_shuffle_results:
         how_many_previous_available, table = await backend_worker.load_previous_songs()
-        table_shuffle_results.innerHTML = table
+        table_shuffle_results.element.innerHTML = table
     if how_many_previous_available == 0:
         back_button_manager.disable()
 
 
 async def ui_new_search(*args, **kwargs) -> None:
     search_term = str(document.getElementById("search-input").value).replace(" - ", " ").strip()
-    result = await backend_worker.new_search(search_term)
-    table_search_results.innerHTML = result
+    with search_button_manager, table_search_results:
+        result = await backend_worker.new_search(search_term)
+        table_search_results.element.innerHTML = result
 
 
 async def ui_new_search_on_keypress(event) -> None:
